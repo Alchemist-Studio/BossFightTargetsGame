@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Boss Fight Targets Game</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #050713;
+      color: #f8fbff;
+      font-family: "Courier New", monospace;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+    }
+
+    .game-shell {
+      position: relative;
+      width: min(100vw, 56.25vh);
+      height: min(100vh, 177.78vw);
+      max-width: 560px;
+      max-height: 996px;
+      background: #050713;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      image-rendering: auto;
+      touch-action: none;
+    }
+
+    .hud {
+      position: absolute;
+      top: 14px;
+      left: 0;
+      right: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 18px;
+      color: white;
+      font-size: clamp(16px, 4vw, 28px);
+      line-height: 1;
+      text-shadow: 0 2px 0 #000, 0 0 12px rgba(255, 255, 255, 0.55);
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 28px;
+      background: rgba(2, 4, 16, 0.58);
+      text-align: center;
+    }
+
+    .overlay[hidden] {
+      display: none;
+    }
+
+    .panel {
+      width: min(100%, 380px);
+      padding: 22px;
+      border: 2px solid rgba(255, 255, 255, 0.55);
+      border-radius: 8px;
+      background: rgba(4, 8, 24, 0.86);
+      box-shadow: 0 0 34px rgba(82, 177, 255, 0.28);
+    }
+
+    h1 {
+      margin: 0 0 14px;
+      font-size: clamp(24px, 7vw, 44px);
+      letter-spacing: 0;
+      line-height: 0.95;
+    }
+
+    p {
+      margin: 0 0 16px;
+      font-size: clamp(13px, 3.2vw, 18px);
+      line-height: 1.45;
+    }
+
+    button {
+      width: 100%;
+      min-height: 48px;
+      border: 0;
+      border-radius: 6px;
+      background: #ffcf34;
+      color: #11131f;
+      font: 700 clamp(16px, 4vw, 20px) "Courier New", monospace;
+      cursor: pointer;
+      box-shadow: 0 4px 0 #b56a00, 0 0 18px rgba(255, 207, 52, 0.35);
+    }
+
+    button:active {
+      transform: translateY(2px);
+      box-shadow: 0 2px 0 #b56a00, 0 0 18px rgba(255, 207, 52, 0.35);
+    }
+  </style>
+</head>
+<body>
+  <main class="game-shell">
+    <canvas id="game" width="540" height="960" aria-label="Space invaders game"></canvas>
+    <div class="hud">
+      <span id="score">SCORE: 0</span>
+      <span id="lives">LIVES: 3</span>
+    </div>
+    <section id="overlay" class="overlay">
+      <div class="panel">
+        <h1>SPACE TARGETS</h1>
+        <p>Move with arrow keys or drag. Shoot with space or tap. Clear the colored blocks before they reach you.</p>
+        <button id="startButton" type="button">START</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    const scoreEl = document.getElementById("score");
+    const livesEl = document.getElementById("lives");
+    const overlay = document.getElementById("overlay");
+    const startButton = document.getElementById("startButton");
+
+    const W = canvas.width;
+    const H = canvas.height;
+    const assets = {
+      background: loadImage("assets/space-background.png"),
+      ship: loadImage("assets/player-ship.png"),
+      laser: loadImage("assets/laser.png")
+    };
+
+    const keys = new Set();
+    const colors = ["#ff3b30", "#ffcc00", "#34c759", "#00c7ff", "#af52de", "#ff7a00", "#f72585"];
+    let player;
+    let bullets;
+    let enemies;
+    let particles;
+    let score;
+    let lives;
+    let enemyDirection;
+    let enemyStepTimer;
+    let bulletCooldown;
+    let running = false;
+    let lastTime = 0;
+    let pointerDown = false;
+
+    function loadImage(src) {
+      const image = new Image();
+      image.src = src;
+      return image;
+    }
+
+    function resetGame() {
+      player = {
+        x: W / 2,
+        y: H - 110,
+        width: 92,
+        height: 120,
+        speed: 420
+      };
+      bullets = [];
+      enemies = [];
+      particles = [];
+      score = 0;
+      lives = 3;
+      enemyDirection = 1;
+      enemyStepTimer = 0;
+      bulletCooldown = 0;
+      createEnemies();
+      updateHud();
+    }
+
+    function createEnemies() {
+      const rows = 5;
+      const cols = 7;
+      const blockW = 42;
+      const blockH = 32;
+      const gap = 18;
+      const startX = (W - cols * blockW - (cols - 1) * gap) / 2;
+      const startY = 104;
+
+      for (let row = 0; row < rows; row += 1) {
+        for (let col = 0; col < cols; col += 1) {
+          enemies.push({
+            x: startX + col * (blockW + gap),
+            y: startY + row * (blockH + gap),
+            width: blockW,
+            height: blockH,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            alive: true
+          });
+        }
+      }
+    }
+
+    function startGame() {
+      resetGame();
+      running = true;
+      overlay.hidden = true;
+      lastTime = performance.now();
+      requestAnimationFrame(loop);
+    }
+
+    function endGame(title, message) {
+      running = false;
+      overlay.hidden = false;
+      overlay.querySelector("h1").textContent = title;
+      overlay.querySelector("p").textContent = message;
+      startButton.textContent = "RESTART";
+    }
+
+    function loop(now) {
+      if (!running) return;
+      const dt = Math.min((now - lastTime) / 1000, 0.033);
+      lastTime = now;
+      update(dt);
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    function update(dt) {
+      const move = (keys.has("ArrowRight") || keys.has("KeyD") ? 1 : 0) - (keys.has("ArrowLeft") || keys.has("KeyA") ? 1 : 0);
+      player.x = clamp(player.x + move * player.speed * dt, player.width / 2 + 10, W - player.width / 2 - 10);
+
+      bulletCooldown = Math.max(0, bulletCooldown - dt);
+      if ((keys.has("Space") || keys.has("ArrowUp") || keys.has("KeyW")) && bulletCooldown === 0) {
+        shoot();
+      }
+
+      for (const bullet of bullets) {
+        bullet.y -= bullet.speed * dt;
+      }
+      bullets = bullets.filter((bullet) => bullet.y + bullet.height > -20);
+
+      updateEnemies(dt);
+      updateParticles(dt);
+      checkCollisions();
+
+      if (enemies.every((enemy) => !enemy.alive)) {
+        score += 250;
+        createEnemies();
+      }
+    }
+
+    function updateEnemies(dt) {
+      enemyStepTimer += dt;
+      const aliveEnemies = enemies.filter((enemy) => enemy.alive);
+      if (aliveEnemies.length === 0 || enemyStepTimer < 0.34) return;
+
+      enemyStepTimer = 0;
+      const left = Math.min(...aliveEnemies.map((enemy) => enemy.x));
+      const right = Math.max(...aliveEnemies.map((enemy) => enemy.x + enemy.width));
+      const hitEdge = (enemyDirection < 0 && left < 22) || (enemyDirection > 0 && right > W - 22);
+
+      for (const enemy of aliveEnemies) {
+        if (hitEdge) {
+          enemy.y += 28;
+        } else {
+          enemy.x += enemyDirection * 18;
+        }
+
+        if (enemy.y + enemy.height >= player.y - player.height / 2) {
+          loseLife();
+          return;
+        }
+      }
+
+      if (hitEdge) {
+        enemyDirection *= -1;
+      }
+    }
+
+    function shoot() {
+      bullets.push({
+        x: player.x,
+        y: player.y - player.height / 2 + 10,
+        width: 24,
+        height: 76,
+        speed: 660
+      });
+      bulletCooldown = 0.2;
+    }
+
+    function checkCollisions() {
+      for (const bullet of bullets) {
+        if (bullet.hit) continue;
+        for (const enemy of enemies) {
+          if (!enemy.alive) continue;
+          if (rectsOverlap(
+            bullet.x - bullet.width / 2,
+            bullet.y - bullet.height / 2,
+            bullet.width,
+            bullet.height,
+            enemy.x,
+            enemy.y,
+            enemy.width,
+            enemy.height
+          )) {
+            bullet.hit = true;
+            enemy.alive = false;
+            score += 10;
+            burst(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, enemy.color);
+            updateHud();
+            break;
+          }
+        }
+      }
+      bullets = bullets.filter((bullet) => !bullet.hit);
+    }
+
+    function loseLife() {
+      lives -= 1;
+      updateHud();
+      burst(player.x, player.y - 20, "#ffcf34");
+      if (lives <= 0) {
+        endGame("GAME OVER", `Final score: ${score}`);
+        return;
+      }
+      enemies = [];
+      createEnemies();
+      player.x = W / 2;
+    }
+
+    function burst(x, y, color) {
+      for (let i = 0; i < 16; i += 1) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 80 + Math.random() * 180;
+        particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 0.42,
+          color
+        });
+      }
+    }
+
+    function updateParticles(dt) {
+      for (const particle of particles) {
+        particle.x += particle.vx * dt;
+        particle.y += particle.vy * dt;
+        particle.life -= dt;
+      }
+      particles = particles.filter((particle) => particle.life > 0);
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      drawBackground();
+      drawBullets();
+      drawEnemies();
+      drawPlayer();
+      drawParticles();
+    }
+
+    function drawBackground() {
+      const image = assets.background;
+      if (image.complete) {
+        ctx.drawImage(image, 0, 0, W, H);
+      } else {
+        ctx.fillStyle = "#050713";
+        ctx.fillRect(0, 0, W, H);
+      }
+    }
+
+    function drawPlayer() {
+      const image = assets.ship;
+      if (!image.complete) return;
+      ctx.drawImage(
+        image,
+        player.x - player.width / 2,
+        player.y - player.height / 2,
+        player.width,
+        player.height
+      );
+    }
+
+    function drawBullets() {
+      const image = assets.laser;
+      for (const bullet of bullets) {
+        if (image.complete) {
+          ctx.drawImage(
+            image,
+            bullet.x - bullet.width / 2,
+            bullet.y - bullet.height / 2,
+            bullet.width,
+            bullet.height
+          );
+        }
+      }
+    }
+
+    function drawEnemies() {
+      for (const enemy of enemies) {
+        if (!enemy.alive) continue;
+        ctx.fillStyle = enemy.color;
+        ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.22)";
+        ctx.fillRect(enemy.x + 4, enemy.y + 4, enemy.width - 8, 7);
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(enemy.x + 1, enemy.y + 1, enemy.width - 2, enemy.height - 2);
+      }
+    }
+
+    function drawParticles() {
+      for (const particle of particles) {
+        ctx.globalAlpha = Math.max(0, particle.life / 0.42);
+        ctx.fillStyle = particle.color;
+        ctx.fillRect(particle.x - 3, particle.y - 3, 6, 6);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function updateHud() {
+      scoreEl.textContent = `SCORE: ${score}`;
+      livesEl.textContent = `LIVES: ${lives}`;
+    }
+
+    function rectsOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
+      return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(Math.max(value, min), max);
+    }
+
+    function pointerX(event) {
+      const rect = canvas.getBoundingClientRect();
+      return ((event.clientX - rect.left) / rect.width) * W;
+    }
+
+    window.addEventListener("keydown", (event) => {
+      keys.add(event.code);
+      if (["ArrowLeft", "ArrowRight", "ArrowUp", "Space"].includes(event.code)) {
+        event.preventDefault();
+      }
+    });
+
+    window.addEventListener("keyup", (event) => {
+      keys.delete(event.code);
+    });
+
+    canvas.addEventListener("pointerdown", (event) => {
+      pointerDown = true;
+      if (running) {
+        player.x = clamp(pointerX(event), player.width / 2 + 10, W - player.width / 2 - 10);
+        shoot();
+      }
+    });
+
+    canvas.addEventListener("pointermove", (event) => {
+      if (pointerDown && running) {
+        player.x = clamp(pointerX(event), player.width / 2 + 10, W - player.width / 2 - 10);
+      }
+    });
+
+    window.addEventListener("pointerup", () => {
+      pointerDown = false;
+    });
+
+    startButton.addEventListener("click", startGame);
+    Promise.all(Object.values(assets).map((image) => image.decode().catch(() => null))).then(draw);
+  </script>
+</body>
+</html>
