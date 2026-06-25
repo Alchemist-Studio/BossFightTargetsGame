@@ -210,6 +210,7 @@
       const image = enemyImages[nextEnemyImageIndex % enemyImages.length];
       nextEnemyImageIndex += 1;
       spawnedCount += 1;
+      const maxHp = enemyHpFor(spawnedCount);
       enemies.push({
         x: randomBetween(28, W - enemyW - 28),
         y: -enemyH + yOffset,
@@ -217,6 +218,8 @@
         height: enemyH,
         image,
         color: particleColor(nextEnemyImageIndex),
+        hp: maxHp,
+        maxHp,
         driftX: randomBetween(-12, 12),
         speedY: randomBetween(12, 24) + Math.min(spawnedCount, 60) * 0.08,
         shootTimer: randomBetween(1.4, 3.6),
@@ -288,7 +291,10 @@
     function spawnEnemies(dt) {
       const aliveCount = enemies.filter((enemy) => enemy.alive).length;
       if (aliveCount >= 8 || spawnTimer > 0) return;
-      spawnEnemy(0);
+      const spawnCount = Math.min(8 - aliveCount, aliveCount <= 3 ? 3 : 2);
+      for (let i = 0; i < spawnCount; i += 1) {
+        spawnEnemy(-i * 74);
+      }
       spawnTimer = nextSpawnDelay();
     }
 
@@ -365,9 +371,15 @@
             enemy.height
           )) {
             bullet.hit = true;
-            enemy.alive = false;
-            score += 10;
-            enemyExplosion(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, enemy.color);
+            enemy.hp -= 1;
+            if (enemy.hp <= 0) {
+              enemy.alive = false;
+              score += enemy.maxHp * 10;
+              enemyExplosion(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, enemy.color, enemy.maxHp * 10);
+            } else {
+              score += 2;
+              hitSpark(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, enemy.color);
+            }
             updateHud();
             break;
           }
@@ -417,7 +429,7 @@
       playerInvulnerable = 1.25;
     }
 
-    function enemyExplosion(x, y, color) {
+    function enemyExplosion(x, y, color, points) {
       burst(x, y, color, 36);
       particles.push({
         type: "ring",
@@ -444,9 +456,23 @@
       floatTexts.push({
         x,
         y: y - 18,
-        text: "+10",
+        text: `+${points}`,
         life: 0.62,
         maxLife: 0.62
+      });
+    }
+
+    function hitSpark(x, y, color) {
+      burst(x, y, color, 10);
+      particles.push({
+        type: "ring",
+        x,
+        y,
+        radius: 5,
+        maxRadius: 24,
+        life: 0.2,
+        maxLife: 0.2,
+        color
       });
     }
 
@@ -581,7 +607,28 @@
           ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
         }
         ctx.restore();
+        drawEnemyHealth(enemy);
       }
+    }
+
+    function drawEnemyHealth(enemy) {
+      if (enemy.maxHp <= 1 && enemy.hp === enemy.maxHp) return;
+      const barW = enemy.width * 0.78;
+      const barH = 7;
+      const x = enemy.x + (enemy.width - barW) / 2;
+      const y = enemy.y + enemy.height + 9;
+      const pct = clamp(enemy.hp / enemy.maxHp, 0, 1);
+      ctx.save();
+      ctx.fillStyle = "rgba(8, 10, 22, 0.78)";
+      ctx.fillRect(x, y, barW, barH);
+      ctx.fillStyle = pct > 0.5 ? "#34c759" : pct > 0.25 ? "#ffcf34" : "#ff3b30";
+      ctx.shadowColor = ctx.fillStyle;
+      ctx.shadowBlur = 8;
+      ctx.fillRect(x, y, barW * pct, barH);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.72)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, y, barW, barH);
+      ctx.restore();
     }
 
     function drawParticles() {
@@ -654,7 +701,14 @@
     }
 
     function nextSpawnDelay() {
-      return Math.max(0.75, 1.65 - Math.min(spawnedCount, 40) * 0.015);
+      return Math.max(0.28, 0.9 - Math.min(spawnedCount, 45) * 0.008);
+    }
+
+    function enemyHpFor(count) {
+      if (count > 18 && count % 9 === 0) return 4;
+      if (count > 8 && count % 4 === 0) return 3;
+      if (count > 4 && count % 3 === 0) return 2;
+      return 1;
     }
 
     function drawContainedImage(image, x, y, width, height) {
