@@ -153,15 +153,15 @@
     const keys = new Set();
     let player;
     let bullets;
+    let enemyBullets;
     let enemies;
     let particles;
     let score;
     let lives;
-    let enemyDirection;
-    let enemyStepTimer;
     let bulletCooldown;
     let wave;
     let nextEnemyImageIndex;
+    let playerInvulnerable;
     let running = false;
     let lastTime = 0;
     let pointerDown = false;
@@ -181,23 +181,21 @@
         speed: 420
       };
       bullets = [];
+      enemyBullets = [];
       enemies = [];
       particles = [];
       score = 0;
       lives = 3;
       wave = 0;
       nextEnemyImageIndex = 0;
-      enemyDirection = 1;
-      enemyStepTimer = 0;
       bulletCooldown = 0;
+      playerInvulnerable = 0;
       createEnemies();
       updateHud();
     }
 
     function createEnemies() {
       wave += 1;
-      enemyDirection = 1;
-      enemyStepTimer = 0;
       const cols = 3;
       const rows = wave % 3 === 0 ? 3 : 2;
       const enemyW = 88;
@@ -218,6 +216,10 @@
             height: enemyH,
             image,
             color: particleColor(nextEnemyImageIndex),
+            driftX: randomBetween(-10, 10),
+            speedY: randomBetween(10, 24) + Math.min(wave, 8) * 1.5,
+            shootTimer: randomBetween(1.1, 3.2),
+            shootEvery: randomBetween(2.8, 5.2),
             alive: true
           });
         }
@@ -263,6 +265,15 @@
       }
       bullets = bullets.filter((bullet) => bullet.y + bullet.height > -20);
 
+      for (const bullet of enemyBullets) {
+        bullet.x += bullet.vx * dt;
+        bullet.y += bullet.vy * dt;
+      }
+      enemyBullets = enemyBullets.filter((bullet) => {
+        return bullet.x > -40 && bullet.x < W + 40 && bullet.y > -40 && bullet.y < H + 60 && !bullet.hit;
+      });
+
+      playerInvulnerable = Math.max(0, playerInvulnerable - dt);
       updateEnemies(dt);
       updateParticles(dt);
       checkCollisions();
@@ -275,30 +286,28 @@
     }
 
     function updateEnemies(dt) {
-      enemyStepTimer += dt;
       const aliveEnemies = enemies.filter((enemy) => enemy.alive);
-      if (aliveEnemies.length === 0 || enemyStepTimer < 0.4) return;
-
-      enemyStepTimer = 0;
-      const left = Math.min(...aliveEnemies.map((enemy) => enemy.x));
-      const right = Math.max(...aliveEnemies.map((enemy) => enemy.x + enemy.width));
-      const hitEdge = (enemyDirection < 0 && left < 22) || (enemyDirection > 0 && right > W - 22);
+      if (aliveEnemies.length === 0) return;
 
       for (const enemy of aliveEnemies) {
-        if (hitEdge) {
-          enemy.y += 24;
-        } else {
-          enemy.x += enemyDirection * 16;
+        enemy.x += enemy.driftX * dt;
+        enemy.y += enemy.speedY * dt;
+
+        if (enemy.x < 18 || enemy.x + enemy.width > W - 18) {
+          enemy.driftX *= -1;
+          enemy.x = clamp(enemy.x, 18, W - enemy.width - 18);
+        }
+
+        enemy.shootTimer -= dt;
+        if (enemy.shootTimer <= 0) {
+          enemyShoot(enemy);
+          enemy.shootTimer = enemy.shootEvery + randomBetween(-0.55, 0.75);
         }
 
         if (enemy.y + enemy.height >= player.y - player.height / 2) {
           loseLife();
           return;
         }
-      }
-
-      if (hitEdge) {
-        enemyDirection *= -1;
       }
     }
 
@@ -311,6 +320,26 @@
         speed: 660
       });
       bulletCooldown = 0.2;
+    }
+
+    function enemyShoot(enemy) {
+      const startX = enemy.x + enemy.width / 2;
+      const startY = enemy.y + enemy.height * 0.74;
+      const targetX = player.x;
+      const targetY = player.y - player.height * 0.18;
+      const dx = targetX - startX;
+      const dy = targetY - startY;
+      const length = Math.hypot(dx, dy) || 1;
+      const speed = randomBetween(125, 190) + Math.min(wave, 8) * 5;
+      enemyBullets.push({
+        x: startX,
+        y: startY,
+        vx: (dx / length) * speed,
+        vy: (dy / length) * speed,
+        width: 12,
+        height: 22,
+        color: enemy.color
+      });
     }
 
     function checkCollisions() {
@@ -338,6 +367,31 @@
         }
       }
       bullets = bullets.filter((bullet) => !bullet.hit);
+
+      if (playerInvulnerable > 0) return;
+      const playerBox = {
+        x: player.x - player.width * 0.32,
+        y: player.y - player.height * 0.34,
+        width: player.width * 0.64,
+        height: player.height * 0.6
+      };
+
+      for (const bullet of enemyBullets) {
+        if (rectsOverlap(
+          bullet.x - bullet.width / 2,
+          bullet.y - bullet.height / 2,
+          bullet.width,
+          bullet.height,
+          playerBox.x,
+          playerBox.y,
+          playerBox.width,
+          playerBox.height
+        )) {
+          bullet.hit = true;
+          loseLife();
+          break;
+        }
+      }
     }
 
     function loseLife() {
@@ -348,9 +402,11 @@
         endGame("GAME OVER", `Final score: ${score}`);
         return;
       }
+      enemyBullets = [];
       enemies = [];
       createEnemies();
       player.x = W / 2;
+      playerInvulnerable = 1.25;
     }
 
     function burst(x, y, color) {
@@ -383,6 +439,7 @@
       drawBullets();
       drawEnemies();
       drawPlayer();
+      drawEnemyBullets();
       drawParticles();
     }
 
@@ -400,6 +457,10 @@
       if (!player) return;
       const image = assets.ship;
       if (!image.complete) return;
+      ctx.save();
+      if (playerInvulnerable > 0) {
+        ctx.globalAlpha = 0.45 + Math.sin(performance.now() * 0.03) * 0.25;
+      }
       ctx.drawImage(
         image,
         player.x - player.width / 2,
@@ -407,6 +468,7 @@
         player.width,
         player.height
       );
+      ctx.restore();
     }
 
     function drawBullets() {
@@ -422,6 +484,26 @@
             bullet.height
           );
         }
+      }
+    }
+
+    function drawEnemyBullets() {
+      if (!enemyBullets) return;
+      for (const bullet of enemyBullets) {
+        ctx.save();
+        ctx.translate(bullet.x, bullet.y);
+        ctx.rotate(Math.atan2(bullet.vy, bullet.vx) + Math.PI / 2);
+        const gradient = ctx.createLinearGradient(0, -bullet.height / 2, 0, bullet.height / 2);
+        gradient.addColorStop(0, "#fff2a8");
+        gradient.addColorStop(0.45, "#ff6b2c");
+        gradient.addColorStop(1, "#ff1f4f");
+        ctx.shadowColor = bullet.color;
+        ctx.shadowBlur = 14;
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.roundRect(-bullet.width / 2, -bullet.height / 2, bullet.width, bullet.height, 6);
+        ctx.fill();
+        ctx.restore();
       }
     }
 
@@ -464,6 +546,10 @@
 
     function clamp(value, min, max) {
       return Math.min(Math.max(value, min), max);
+    }
+
+    function randomBetween(min, max) {
+      return min + Math.random() * (max - min);
     }
 
     function drawContainedImage(image, x, y, width, height) {
