@@ -129,7 +129,7 @@
     <section id="overlay" class="overlay">
       <div class="panel">
         <h1>SPACE TARGETS</h1>
-        <p>Move with arrow keys or drag. Shoot with space or tap. Clear the formation before it reaches you.</p>
+        <p>Move with arrow keys or drag. Your ship fires automatically. Clear the formation before it reaches you.</p>
         <button id="startButton" type="button">START</button>
       </div>
     </section>
@@ -273,7 +273,7 @@
       player.x = clamp(player.x + move * player.speed * dt, player.width / 2 + 10, W - player.width / 2 - 10);
 
       bulletCooldown = Math.max(0, bulletCooldown - dt);
-      if ((keys.has("Space") || keys.has("ArrowUp") || keys.has("KeyW")) && bulletCooldown === 0) {
+      if (bulletCooldown === 0) {
         shoot();
       }
 
@@ -790,7 +790,6 @@
       pointerDown = true;
       if (running) {
         movePlayerToPointer(event);
-        shoot();
       }
     });
 
