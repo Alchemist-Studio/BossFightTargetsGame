@@ -771,6 +771,10 @@
       return ((event.clientX - rect.left) / rect.width) * W;
     }
 
+    function movePlayerToPointer(event) {
+      player.x = clamp(pointerX(event), player.width / 2 + 10, W - player.width / 2 - 10);
+    }
+
     window.addEventListener("keydown", (event) => {
       keys.add(event.code);
       if (["ArrowLeft", "ArrowRight", "ArrowUp", "Space"].includes(event.code)) {
@@ -785,14 +789,15 @@
     canvas.addEventListener("pointerdown", (event) => {
       pointerDown = true;
       if (running) {
-        player.x = clamp(pointerX(event), player.width / 2 + 10, W - player.width / 2 - 10);
+        movePlayerToPointer(event);
         shoot();
       }
     });
 
     canvas.addEventListener("pointermove", (event) => {
-      if (pointerDown && running) {
-        player.x = clamp(pointerX(event), player.width / 2 + 10, W - player.width / 2 - 10);
+      if (!running) return;
+      if (event.pointerType === "mouse" || pointerDown) {
+        movePlayerToPointer(event);
       }
     });
 
