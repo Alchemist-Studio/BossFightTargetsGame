@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Boss Fight Targets Game</title>
+  <title>City Invaders</title>
   <style>
     * {
       box-sizing: border-box;
@@ -15,7 +15,7 @@
       height: 100%;
       margin: 0;
       overflow: hidden;
-      background: #050713;
+      background: #0b1116;
       color: #f8fbff;
       font-family: Impact, Haettenschweiler, "Arial Narrow Bold", "Trebuchet MS", sans-serif;
     }
@@ -31,8 +31,9 @@
       height: min(100vh, 177.78vw);
       max-width: 560px;
       max-height: 996px;
-      background: #050713;
+      background: #0b1116;
       overflow: hidden;
+      box-shadow: 0 0 80px #000;
     }
 
     canvas {
@@ -69,29 +70,111 @@
       display: grid;
       place-items: center;
       padding: 28px;
-      background: rgba(2, 4, 16, 0.58);
+      background:
+        linear-gradient(180deg, rgba(4, 8, 10, 0.18), rgba(3, 6, 8, 0.82)),
+        url("assets/city-background.png") center / cover;
       text-align: center;
+      z-index: 5;
+      transition: opacity .35s ease, visibility .35s ease;
     }
 
     .overlay[hidden] {
-      display: none;
+      display: grid;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
     }
 
     .panel {
       width: min(100%, 380px);
-      padding: 22px;
-      border: 2px solid rgba(255, 255, 255, 0.55);
-      border-radius: 8px;
-      background: rgba(4, 8, 24, 0.86);
-      box-shadow: 0 0 34px rgba(82, 177, 255, 0.28);
+      padding: 28px 22px 22px;
+      border: 1px solid rgba(255, 190, 69, 0.65);
+      border-radius: 2px;
+      background: linear-gradient(145deg, rgba(12, 18, 19, .94), rgba(29, 22, 15, .88));
+      box-shadow: 0 18px 60px #000, inset 0 0 35px rgba(255, 145, 26, .08);
+      clip-path: polygon(18px 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%, 0 18px);
+      animation: panelIn .65s cubic-bezier(.16, 1, .3, 1) both;
     }
 
     h1 {
       margin: 0 0 14px;
-      font-size: clamp(24px, 7vw, 44px);
-      letter-spacing: 0;
+      font-size: clamp(34px, 9vw, 55px);
+      letter-spacing: 2px;
       line-height: 0.95;
-      text-shadow: 0 3px 0 #11131f, 0 0 20px rgba(255, 207, 52, 0.4);
+      color: #fff4d2;
+      text-shadow: 0 4px 0 #6e240c, 0 0 24px rgba(255, 137, 35, .72);
+    }
+
+    .title-logo-link {
+      display: block;
+      margin-bottom: 18px;
+      color: #ffbd55;
+      font: 700 11px "Trebuchet MS", sans-serif;
+      letter-spacing: 1px;
+      text-decoration: none;
+    }
+
+    .title-logo {
+      display: block;
+      width: 100%;
+      border: 1px solid rgba(255, 190, 69, 0.45);
+      box-shadow: 0 8px 26px rgba(0, 0, 0, 0.55);
+      transition: filter .15s ease, transform .15s ease;
+    }
+
+    .title-logo-link:hover .title-logo,
+    .title-logo-link:focus-visible .title-logo {
+      filter: brightness(1.12);
+      transform: scale(1.015);
+    }
+
+    .title-logo-link span {
+      display: block;
+      margin-top: 7px;
+    }
+
+    .panel h1 {
+      display: none;
+    }
+
+    .overlay.ending .title-logo-link {
+      display: none;
+    }
+
+    .overlay.ending .panel h1 {
+      display: block;
+    }
+
+    .eyebrow {
+      margin-bottom: 9px;
+      color: #ffad32;
+      font: 800 11px "Trebuchet MS", sans-serif;
+      letter-spacing: 5px;
+    }
+
+    .title-word {
+      display: block;
+      white-space: nowrap;
+    }
+
+    .letter {
+      display: inline-block;
+      opacity: 0;
+      transform: translateY(-65px) rotate(-10deg) scale(1.5);
+      animation: letterDrop .55s cubic-bezier(.2, .8, .2, 1.25) forwards;
+      animation-delay: calc(var(--i) * 45ms + 160ms);
+    }
+
+    .overlay.ending .letter {
+      transform: scale(3) rotate(12deg);
+      animation-name: endLetter;
+      animation-duration: .65s;
+    }
+
+    .mission-line {
+      color: #d6d3c8;
+      border-top: 1px solid rgba(255,255,255,.14);
+      padding-top: 15px;
     }
 
     p {
@@ -105,34 +188,109 @@
       width: 100%;
       min-height: 48px;
       border: 0;
-      border-radius: 6px;
-      background: #ffcf34;
-      color: #11131f;
+      border: 1px solid #ffe2a3;
+      border-radius: 2px;
+      background: linear-gradient(#ffbb42, #db690e);
+      color: #201208;
       font: 900 clamp(16px, 4vw, 20px) Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
       cursor: pointer;
-      box-shadow: 0 4px 0 #b56a00, 0 0 18px rgba(255, 207, 52, 0.35);
+      letter-spacing: 2px;
+      box-shadow: 0 5px 0 #713109, 0 0 22px rgba(255, 144, 31, .42);
+      transition: transform .15s ease, filter .15s ease;
+    }
+
+    button:hover {
+      filter: brightness(1.14);
+      transform: translateY(-2px);
     }
 
     button:active {
       transform: translateY(2px);
       box-shadow: 0 2px 0 #b56a00, 0 0 18px rgba(255, 207, 52, 0.35);
     }
+
+    .transition {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      pointer-events: none;
+      visibility: hidden;
+    }
+
+    .transition::before,
+    .transition::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 51%;
+      background: #070a0a;
+      transition: transform .42s cubic-bezier(.75, 0, .25, 1);
+    }
+
+    .transition::before { top: 0; transform: translateY(-101%); }
+    .transition::after { bottom: 0; transform: translateY(101%); }
+    .transition.active { visibility: visible; }
+    .transition.active::before, .transition.active::after { transform: translateY(0); }
+    .transition.open::before { transform: translateY(-101%); }
+    .transition.open::after { transform: translateY(101%); }
+
+    .battle-callout {
+      position: absolute;
+      top: 43%;
+      left: 0;
+      right: 0;
+      z-index: 4;
+      color: #fff4d2;
+      text-align: center;
+      font-size: 54px;
+      letter-spacing: 4px;
+      text-shadow: 0 5px 0 #792a0d, 0 0 25px #ff8d20;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .battle-callout.show { animation: callout 1.25s ease both; }
+
+    @keyframes panelIn {
+      from { opacity: 0; transform: translateY(35px) scale(.92); }
+    }
+    @keyframes letterDrop {
+      70% { opacity: 1; transform: translateY(6px) rotate(2deg) scale(.96); }
+      100% { opacity: 1; transform: none; }
+    }
+    @keyframes endLetter {
+      65% { opacity: 1; transform: scale(.88) rotate(-2deg); }
+      100% { opacity: 1; transform: none; }
+    }
+    @keyframes callout {
+      0% { opacity: 0; transform: scale(2.6); filter: blur(8px); }
+      24%, 72% { opacity: 1; transform: scale(1); filter: blur(0); }
+      100% { opacity: 0; transform: scale(.72); letter-spacing: 15px; }
+    }
   </style>
 </head>
 <body>
   <main class="game-shell">
-    <canvas id="game" width="540" height="960" aria-label="Space invaders game"></canvas>
+    <canvas id="game" width="540" height="960" aria-label="City invaders game"></canvas>
     <div class="hud">
       <span id="score">SCORE: 0</span>
       <span id="lives">LIVES: 3</span>
     </div>
     <section id="overlay" class="overlay">
       <div class="panel">
-        <h1>BOSS FIGHT TARGETS</h1>
-        <p>Move with arrow keys or drag. Your ship fires automatically. Clear the formation before it reaches you.</p>
-        <button id="startButton" type="button">START</button>
+        <div class="eyebrow">CITY DEFENSE COMMAND</div>
+        <a class="title-logo-link" href="https://bossfighttargets.com" target="_blank" rel="noopener noreferrer">
+          <img class="title-logo" src="assets/boss-fight-targets-screen.jpg" alt="Visit Boss Fight Targets">
+          <span>VISIT BOSSFIGHTTARGETS.COM ↗</span>
+        </a>
+        <h1 data-title="CITY INVADERS">CITY INVADERS</h1>
+        <p class="mission-line">The city is under siege. Move with arrow keys or drag. Your tank fires automatically—stop the invaders before they break the line.</p>
+        <button id="startButton" type="button">DEPLOY TANK</button>
       </div>
     </section>
+    <div id="battleCallout" class="battle-callout">DEFEND THE CITY</div>
+    <div id="transition" class="transition"></div>
   </main>
 
   <script>
@@ -142,13 +300,14 @@
     const livesEl = document.getElementById("lives");
     const overlay = document.getElementById("overlay");
     const startButton = document.getElementById("startButton");
+    const transition = document.getElementById("transition");
+    const battleCallout = document.getElementById("battleCallout");
 
     const W = canvas.width;
     const H = canvas.height;
     const assets = {
-      background: loadImage("assets/space-background.png"),
-      ship: loadImage("assets/player-ship.png"),
-      laser: loadImage("assets/laser.png")
+      background: loadImage("assets/city-background.png"),
+      tank: loadImage("assets/player-tank.png")
     };
     const enemyImages = Array.from({ length: 21 }, (_, index) => {
       return loadImage(`assets/enemies/enemy-${String(index + 1).padStart(2, "0")}.png`);
@@ -173,6 +332,9 @@
     let running = false;
     let lastTime = 0;
     let pointerDown = false;
+    let starting = false;
+    let shake = 0;
+    let muzzleFlash = 0;
 
     function loadImage(src) {
       const image = new Image();
@@ -184,8 +346,8 @@
       player = {
         x: W / 2,
         y: H - 110,
-        width: 92,
-        height: 120,
+        width: 106,
+        height: 148,
         speed: 420
       };
       bullets = [];
@@ -202,6 +364,8 @@
       nextEnemyImageIndex = 0;
       bulletCooldown = 0;
       playerInvulnerable = 0;
+      shake = 0;
+      muzzleFlash = 0;
       createFormation();
       updateHud();
     }
@@ -212,6 +376,7 @@
       formationStepTimer = 0;
       formationShootTimer = Math.max(0.75, 1.7 - Math.min(level, 8) * 0.1);
       enemies = [];
+      showBattleCallout(level === 1 ? "DEFEND THE CITY" : `WAVE ${level}`);
 
       const cols = 6;
       const rows = 4;
@@ -244,19 +409,32 @@
     }
 
     function startGame() {
-      resetGame();
-      running = true;
-      overlay.hidden = true;
-      lastTime = performance.now();
-      requestAnimationFrame(loop);
+      if (starting) return;
+      starting = true;
+      transition.className = "transition active";
+      setTimeout(() => {
+        resetGame();
+        overlay.hidden = true;
+        overlay.classList.remove("ending");
+        running = true;
+        lastTime = performance.now();
+        requestAnimationFrame(loop);
+        transition.classList.add("open");
+      }, 440);
+      setTimeout(() => {
+        transition.className = "transition";
+        starting = false;
+      }, 920);
     }
 
     function endGame(title, message) {
       running = false;
-      overlay.hidden = false;
-      overlay.querySelector("h1").textContent = title;
+      overlay.classList.add("ending");
+      setAnimatedTitle(title);
       overlay.querySelector("p").textContent = message;
-      startButton.textContent = "RESTART";
+      overlay.querySelector(".eyebrow").textContent = "CITY DEFENSE REPORT";
+      startButton.textContent = "REDEPLOY";
+      setTimeout(() => { overlay.hidden = false; }, 180);
     }
 
     function loop(now) {
@@ -291,6 +469,8 @@
       });
 
       playerInvulnerable = Math.max(0, playerInvulnerable - dt);
+      shake = Math.max(0, shake - dt * 38);
+      muzzleFlash = Math.max(0, muzzleFlash - dt);
       updateEnemies(dt);
       updateParticles(dt);
       checkCollisions();
@@ -354,6 +534,7 @@
         height: 76,
         speed: 660
       });
+      muzzleFlash = 0.055;
       bulletCooldown = 0.2;
     }
 
@@ -440,6 +621,7 @@
       lives -= 1;
       updateHud();
       burst(player.x, player.y - 20, "#ffcf34", 22);
+      shake = 2;
       if (lives <= 0) {
         endGame("GAME OVER", `Final score: ${score}`);
         return true;
@@ -454,6 +636,7 @@
 
     function enemyExplosion(x, y, color, points) {
       burst(x, y, color, 36);
+      shake = Math.max(shake, 0.65);
       particles.push({
         type: "ring",
         x,
@@ -542,6 +725,10 @@
 
     function draw() {
       ctx.clearRect(0, 0, W, H);
+      ctx.save();
+      if (shake > 0) {
+        ctx.translate(randomBetween(-shake, shake), randomBetween(-shake, shake));
+      }
       drawBackground();
       drawBullets();
       drawEnemies();
@@ -549,12 +736,18 @@
       drawEnemyBullets();
       drawParticles();
       drawFloatTexts();
+      ctx.restore();
     }
 
     function drawBackground() {
       const image = assets.background;
       if (image.complete) {
         ctx.drawImage(image, 0, 0, W, H);
+        const haze = ctx.createLinearGradient(0, 0, 0, H);
+        haze.addColorStop(0, "rgba(17, 28, 32, .08)");
+        haze.addColorStop(1, "rgba(3, 8, 9, .28)");
+        ctx.fillStyle = haze;
+        ctx.fillRect(0, 0, W, H);
       } else {
         ctx.fillStyle = "#050713";
         ctx.fillRect(0, 0, W, H);
@@ -563,7 +756,7 @@
 
     function drawPlayer() {
       if (!player) return;
-      const image = assets.ship;
+      const image = assets.tank;
       if (!image.complete) return;
       ctx.save();
       if (playerInvulnerable > 0) {
@@ -576,22 +769,41 @@
         player.width,
         player.height
       );
+      if (muzzleFlash > 0) {
+        const flashY = player.y - player.height / 2 + 3;
+        ctx.globalAlpha = muzzleFlash / .055;
+        ctx.fillStyle = "#fff9be";
+        ctx.shadowColor = "#ff801f";
+        ctx.shadowBlur = 24;
+        ctx.beginPath();
+        ctx.moveTo(player.x, flashY - 25);
+        ctx.lineTo(player.x + 15, flashY + 4);
+        ctx.lineTo(player.x, flashY + 12);
+        ctx.lineTo(player.x - 15, flashY + 4);
+        ctx.closePath();
+        ctx.fill();
+      }
       ctx.restore();
     }
 
     function drawBullets() {
       if (!bullets) return;
-      const image = assets.laser;
       for (const bullet of bullets) {
-        if (image.complete) {
-          ctx.drawImage(
-            image,
-            bullet.x - bullet.width / 2,
-            bullet.y - bullet.height / 2,
-            bullet.width,
-            bullet.height
-          );
-        }
+        ctx.save();
+        ctx.translate(bullet.x, bullet.y);
+        ctx.shadowColor = "#ff8a1f";
+        ctx.shadowBlur = 16;
+        ctx.fillStyle = "#ffed9a";
+        ctx.beginPath();
+        ctx.roundRect(-5, -18, 10, 30, 5);
+        ctx.fill();
+        ctx.fillStyle = "rgba(255, 92, 18, .72)";
+        ctx.beginPath();
+        ctx.moveTo(-6, 10);
+        ctx.lineTo(0, 34 + Math.random() * 10);
+        ctx.lineTo(6, 10);
+        ctx.fill();
+        ctx.restore();
       }
     }
 
@@ -711,6 +923,26 @@
       livesEl.textContent = `LIVES: ${lives}`;
     }
 
+    function setAnimatedTitle(text) {
+      const title = overlay.querySelector("h1");
+      let index = 0;
+      title.innerHTML = text.split(" ").map((word) => {
+        const letters = [...word].map((letter) => {
+          const span = `<span class="letter" style="--i:${index}">${letter}</span>`;
+          index += 1;
+          return span;
+        }).join("");
+        return `<span class="title-word">${letters}</span>`;
+      }).join("");
+    }
+
+    function showBattleCallout(text) {
+      battleCallout.textContent = text;
+      battleCallout.classList.remove("show");
+      void battleCallout.offsetWidth;
+      battleCallout.classList.add("show");
+    }
+
     function rectsOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
       return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
     }
@@ -805,6 +1037,7 @@
     });
 
     startButton.addEventListener("click", startGame);
+    setAnimatedTitle("CITY INVADERS");
     Promise.all([...Object.values(assets), ...enemyImages].map((image) => image.decode().catch(() => null))).then(draw);
   </script>
 </body>
