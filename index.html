@@ -996,9 +996,9 @@
       for (const enemy of enemies) {
         if (!enemy.alive) continue;
         ctx.save();
-        ctx.shadowColor = "rgba(0, 0, 0, 0.58)";
-        ctx.shadowBlur = 16;
-        ctx.shadowOffsetY = 7;
+        ctx.shadowColor = enemy.color;
+        ctx.shadowBlur = 13;
+        ctx.shadowOffsetY = 0;
         if (enemy.image.complete && enemy.image.naturalWidth > 0) {
           drawContainedImage(enemy.image, enemy.x, enemy.y, enemy.width, enemy.height);
         } else {
